@@ -1,1 +1,171 @@
 
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAB Radio Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-size: 0.8rem; /* Font piccoli */
+        }
+        .player {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 90%;
+            max-width: 320px; /* Leggermente più larga per mobile */
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            font-size: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background-color: #f9f9f9;
+        }
+        button {
+            background-color: #1DB954; /* Verde moderno, ispirato a Spotify */
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #18a048;
+        }
+        #info {
+            margin-top: 10px;
+            font-size: 0.75rem;
+            color: #333;
+            text-align: left;
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        audio {
+            width: 100%;
+        }
+        @media (min-width: 600px) {
+            .player {
+                max-width: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="player">
+        <h2>DAB Radio Player</h2>
+        <select id="channel-select">
+            <option value="">Seleziona un canale</option>
+            <option value="groovesalad|https://ice4.somafm.com/groovesalad-128-mp3">Groove Salad (Ambient/Downtempo)</option>
+            <option value="dronezone|https://ice4.somafm.com/dronezone-128-mp3">Drone Zone (Ambient)</option>
+            <option value="secretagent|https://ice4.somafm.com/secretagent-128-mp3">Secret Agent (Lounge/Spy)</option>
+            <option value="illstreet|https://ice4.somafm.com/illstreet-128-mp3">Illinois Street Lounge (Exotica/Lounge)</option>
+            <option value="lush|https://ice4.somafm.com/lush-128-mp3">Lush (Sensual/Electronic)</option>
+            <option value="beatblender|https://ice4.somafm.com/beatblender-128-mp3">Beat Blender (Deep House/Downtempo)</option>
+            <option value="bootliquor|https://ice4.somafm.com/bootliquor-128-mp3">Boot Liquor (Americana Roots)</option>
+            <option value="cliqhop|https://ice4.somafm.com/cliqhop-128-mp3">Cliqhop (IDM/Electronic)</option>
+            <option value="covers|https://ice4.somafm.com/covers-128-mp3">Covers (Eclectic Covers)</option>
+            <option value="deepspaceone|https://ice4.somafm.com/deepspaceone-128-mp3">Deep Space One (Ambient/Electronic)</option>
+            <option value="defcon|https://ice4.somafm.com/defcon-128-mp3">DEF CON (Hacking Music)</option>
+            <option value="digitalis|https://ice4.somafm.com/digitalis-128-mp3">Digitalis (Analog Rock/Electronic)</option>
+            <option value="doomed|https://ice4.somafm.com/doomed-128-mp3">Doomed (Dark Industrial/Ambient)</option>
+            <option value="dubstep|https://ice4.somafm.com/dubstep-128-mp3">Dub Step Beyond (Dubstep/Bass)</option>
+            <option value="fluid|https://ice4.somafm.com/fluid-128-mp3">Fluid (Instrumental Hiphop/Soul)</option>
+            <option value="folkfwd|https://ice4.somafm.com/folkfwd-128-mp3">Folk Forward (Indie Folk)</option>
+            <option value="indiepop|https://ice4.somafm.com/indiepop-128-mp3">Indie Pop Rocks (Indie Pop)</option>
+            <option value="poptron|https://ice4.somafm.com/poptron-128-mp3">PopTron (Electropop/Indie Dance)</option>
+            <option value="seventies|https://ice4.somafm.com/seventies-128-mp3">Left Coast 70s (70s Rock)</option>
+            <option value="sonicuniverse|https://ice4.somafm.com/sonicuniverse-128-mp3">Sonic Universe (Avant-Garde Jazz)</option>
+            <option value="spacestation|https://ice4.somafm.com/spacestation-128-mp3">Space Station Soma (Spaced-Out Electronic)</option>
+            <option value="suburbsofgoa|https://ice4.somafm.com/suburbsofgoa-128-mp3">Suburbs of Goa (World/Asian Beats)</option>
+            <option value="thetrip|https://ice4.somafm.com/thetrip-128-mp3">The Trip (Progressive House/Trance)</option>
+            <option value="thistle|https://ice4.somafm.com/thistle-128-mp3">ThistleRadio (Celtic Music)</option>
+            <option value="u80s|https://ice4.somafm.com/u80s-128-mp3">Underground 80s (Early 80s Synthpop)</option>
+        </select>
+        <audio id="audio-player" controls></audio>
+        <button id="play-pause">Play/Pausa</button>
+        <div id="info">Informazioni: <span id="song-info">Seleziona un canale e avvia la riproduzione.</span></div>
+    </div>
+
+    <script>
+        const select = document.getElementById('channel-select');
+        const audio = document.getElementById('audio-player');
+        const playPauseBtn = document.getElementById('play-pause');
+        const songInfo = document.getElementById('song-info');
+        let intervalId;
+
+        select.addEventListener('change', () => {
+            const value = select.value;
+            if (value) {
+                const [api, url] = value.split('|');
+                audio.src = url;
+                audio.load();
+                startFetchingMetadata(api);
+            }
+        });
+
+        playPauseBtn.addEventListener('click', () => {
+            if (audio.paused) {
+                audio.play();
+                playPauseBtn.textContent = 'Pausa';
+            } else {
+                audio.pause();
+                playPauseBtn.textContent = 'Play';
+            }
+        });
+
+        audio.addEventListener('play', () => {
+            playPauseBtn.textContent = 'Pausa';
+        });
+
+        audio.addEventListener('pause', () => {
+            playPauseBtn.textContent = 'Play';
+        });
+
+        function startFetchingMetadata(channel) {
+            if (intervalId) clearInterval(intervalId);
+            fetchMetadata(channel);
+            intervalId = setInterval(() => fetchMetadata(channel), 15000); // Aggiorna ogni 15 secondi per più reattività
+        }
+
+        function fetchMetadata(channel) {
+            fetch(`https://api.somafm.com/songs/${channel}.json`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.songs && data.songs.length > 0) {
+                        const song = data.songs[0];
+                        songInfo.innerHTML = `
+                            <strong>Titolo:</strong> ${song.title || 'N/A'}<br>
+                            <strong>Artista:</strong> ${song.artist || 'N/A'}<br>
+                            <strong>Album:</strong> ${song.album || 'N/A'}<br>
+                            <strong>Durata:</strong> ${song.length || 'N/A'} secondi<br>
+                            <strong>Data:</strong> ${song.date || 'N/A'}<br>
+                            <strong>DJ:</strong> ${data.dj || 'N/A'}<br>
+                            <strong>Ascoltatori attuali:</strong> ${data.listeners || 'N/A'}<br>
+                            <strong>Ultimo brano:</strong> ${data.lastPlaying || 'N/A'}
+                        `;
+                    } else {
+                        songInfo.textContent = 'Nessuna informazione disponibile.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore nel fetch dei metadati:', error);
+                    songInfo.textContent = 'Errore nel caricamento delle informazioni.';
+                });
+        }
+    </script>
+</body>
+</html>
