@@ -105,7 +105,18 @@
     #player-station-icon img{width:100%;height:100%;object-fit:contain;background:#fff;padding:18px}
     #player-station-name{font-size:21px;font-weight:800;line-height:1.18;max-width:100%;margin-bottom:7px;overflow-wrap:anywhere}
     #player-station-details{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:9px}
-    #now-playing{font-size:13px;color:#f0abfc;min-height:19px;max-width:100%;overflow-wrap:anywhere;margin-bottom:14px}
+    .track-card{width:100%;max-width:480px;min-height:82px;margin:0 0 14px;padding:9px 11px;display:flex;align-items:center;gap:12px;text-align:left;background:linear-gradient(145deg,rgba(31,31,46,.88),rgba(18,18,27,.92));border:1px solid rgba(255,255,255,.07);border-radius:15px;overflow:hidden}
+    .track-cover-wrap{width:64px;height:64px;flex:0 0 64px;border-radius:10px;background:linear-gradient(145deg,#33264a,#171722);display:grid;place-items:center;overflow:hidden;color:#e9d5ff;font-size:28px}
+    #track-cover{width:100%;height:100%;object-fit:cover;display:block}
+    #track-cover[hidden]{display:none}
+    #track-cover-placeholder{display:grid;place-items:center;width:100%;height:100%}
+    #track-cover:not([hidden])+#track-cover-placeholder{display:none}
+    .track-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
+    .track-kicker{font-size:9px;font-weight:800;letter-spacing:.14em;color:#d8b4fe}
+    .track-title{font-size:14px;font-weight:750;line-height:1.25;color:#fff;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+    .track-artist{font-size:12px;color:#e9d5ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .track-album{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .track-source{font-size:9px;color:#77778b;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .visualizer-container{width:100%;height:112px;min-height:112px;margin:2px 0 14px;border-radius:16px;background:rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.04);overflow:hidden;display:none;flex-shrink:0;cursor:pointer;position:relative}
     .visualizer{width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center;gap:2px;padding:10px;position:relative}
     .visualizer-hint{position:absolute;left:0;right:0;bottom:5px;text-align:center;font-size:9px;color:rgba(255,255,255,.34);pointer-events:none}
@@ -408,7 +419,7 @@
     </main>
 
     <div id="mini-player" aria-label="Mini lettore">
-      <div class="mini-art">♫</div>
+      <div class="mini-art" id="mini-art">♫</div>
       <div class="mini-info" id="mini-open"><div id="mini-name">Nessuna radio selezionata</div><div id="mini-status">Scegli una stazione</div></div>
       <button class="mini-action primary" id="mini-play" aria-label="Play o pausa">▶</button>
       <button class="mini-action" id="mini-stop" aria-label="Stop">■</button>
@@ -429,7 +440,16 @@
         <div class="station-art"><div class="station-art-inner" id="player-art"><span id="player-station-icon">♫</span></div></div>
         <div id="player-station-name">Seleziona una stazione</div>
         <div id="player-station-details">Radio Internet</div>
-        <div id="now-playing">Informazioni sul brano non disponibili</div>
+        <section id="now-playing" class="track-card" aria-live="polite">
+          <div class="track-cover-wrap"><img id="track-cover" alt="Copertina del brano" hidden><span id="track-cover-placeholder">♫</span></div>
+          <div class="track-copy">
+            <div class="track-kicker">IN ONDA</div>
+            <div id="track-title" class="track-title">In attesa dei metadati…</div>
+            <div id="track-artist" class="track-artist"></div>
+            <div id="track-album" class="track-album"></div>
+            <div id="track-source" class="track-source">La radio potrebbe non trasmettere informazioni sul brano</div>
+          </div>
+        </section>
         <div class="visualizer-container" id="visualizerContainer" title="Tocca per cambiare visualizzatore"><div class="visualizer" id="visualizer"></div><div class="visualizer-hint" id="visualizer-hint">TOCCA PER CAMBIARE VISUALIZZATORE</div></div>
         <div class="player-controls">
           <button class="round-control" id="prev-station" aria-label="Stazione precedente">⏮</button>
@@ -481,9 +501,11 @@
       list:$('station-list'), loadMore:$('load-more'), loadWrap:$('load-wrap'), sortWrap:$('sort-wrap'), sort:$('sort-select'),
       badge:$('fav-badge'), player:$('player-modal'), playerBack:$('player-back'), playerName:$('player-station-name'),
       playerDetails:$('player-station-details'), playerHeadSub:$('player-head-sub'), playerIcon:$('player-station-icon'),
-      playerArt:$('player-art'), playerFav:$('player-fav'), nowPlaying:$('now-playing'), playerStatus:$('player-status'),
+      playerArt:$('player-art'), playerFav:$('player-fav'), nowPlaying:$('now-playing'), trackCover:$('track-cover'),
+      trackCoverPlaceholder:$('track-cover-placeholder'), trackTitle:$('track-title'), trackArtist:$('track-artist'),
+      trackAlbum:$('track-album'), trackSource:$('track-source'), playerStatus:$('player-status'),
       streamUrl:$('player-stream-url'), play:$('playPause'), stop:$('stopBtn'), volume:$('volume'),
-      mini:$('mini-player'), miniName:$('mini-name'), miniStatus:$('mini-status'), miniPlay:$('mini-play'), miniStop:$('mini-stop'),
+      mini:$('mini-player'), miniArt:$('mini-art'), miniName:$('mini-name'), miniStatus:$('mini-status'), miniPlay:$('mini-play'), miniStop:$('mini-stop'),
       stationModal:$('station-modal'), backupModal:$('backup-modal'), toast:$('toast'),
       manualName:$('manual-name'), manualUrl:$('manual-url'), manualCountry:$('manual-country'), manualTags:$('manual-tags'),
       stationModalStatus:$('station-modal-status'), backupStatus:$('backup-status'), importFile:$('import-file')
@@ -521,6 +543,14 @@
     let playAttempt = 0;
     let playWatchdog = null;
     let metadataTimer = null;
+    let metadataAbort = null;
+    let metadataBusy = false;
+    let metadataStationToken = '';
+    let currentTrack = null;
+    let currentTrackKey = '';
+    let artworkAbort = null;
+    let artworkLookupKey = '';
+    let lastMusicBrainzRequest = 0;
     let scrollObserver = null;
     let visualizerAnimationId = null;
     let currentVisualizerType = 0;
@@ -757,12 +787,25 @@
     function updateFavoriteButtons(){if(!currentStation)return;const fav=isFavorite(currentStation);els.playerFav.textContent=fav?'★':'☆';els.playerFav.classList.toggle('active',fav);els.playerFav.style.color=fav?'var(--star)':'#fff'}
     function updateMiniPlayer(){
       const visible=!!currentStation && !els.player.classList.contains('open');els.mini.classList.toggle('visible',visible);
-      if(currentStation){els.miniName.textContent=currentStation.name;els.miniStatus.textContent=isPlaying?'● In riproduzione':audio.paused?'In pausa':'Pronto';els.miniPlay.textContent=isPlaying?'Ⅱ':'▶'}
+      if(currentStation){
+        els.miniName.textContent=currentTrack?(currentTrack.artist?currentTrack.artist+' – '+currentTrack.title:currentTrack.title):currentStation.name;
+        els.miniStatus.textContent=isPlaying?'● '+currentStation.name:(audio.paused?'In pausa':'Pronto');
+        els.miniPlay.textContent=isPlaying?'Ⅱ':'▶';
+        if(els.miniArt){if(currentTrack&&currentTrack.artwork){els.miniArt.innerHTML='';const img=document.createElement('img');img.alt='';img.src=currentTrack.artwork;img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:10px';img.onerror=()=>{els.miniArt.textContent='♫'};els.miniArt.appendChild(img)}else els.miniArt.textContent='♫'}
+      }
     }
     function updateMediaSession(){
       if(!('mediaSession' in navigator)||!currentStation)return;
       try{
-        navigator.mediaSession.metadata=new MediaMetadata({title:currentStation.name||'DAB Radio',artist:currentStation.country||'Radio Internet',album:(currentStation.tags||'').split(',')[0]||'Diretta',artwork:cloudFreeUrl(currentStation.favicon||'')?[{src:cloudFreeUrl(currentStation.favicon),sizes:'96x96'}]:[]});
+        const track=currentTrack;
+        const artwork=track&&track.artwork?[{src:track.artwork,sizes:'500x500',type:'image/jpeg'}]:
+          (cloudFreeUrl(currentStation.favicon||'')?[{src:cloudFreeUrl(currentStation.favicon),sizes:'96x96'}]:[]);
+        navigator.mediaSession.metadata=new MediaMetadata({
+          title:track&&track.title||currentStation.name||'DAB Radio',
+          artist:track&&track.artist||currentStation.country||'Radio Internet',
+          album:track&&track.album||((currentStation.tags||'').split(',')[0]||'Diretta'),
+          artwork
+        });
         navigator.mediaSession.playbackState=isPlaying?'playing':'paused';
         const actions={play:()=>resumePlayback(),pause:()=>audio.pause(),stop:()=>stopPlayback(),nexttrack:()=>stepStation(1),previoustrack:()=>stepStation(-1)};
         Object.entries(actions).forEach(([name,handler])=>{try{navigator.mediaSession.setActionHandler(name,handler)}catch(_){}})
@@ -790,23 +833,193 @@
     window.addEventListener('popstate',()=>{if(els.player.classList.contains('open'))closePlayer(true)});
     function showPlayerControls(){/* placeholder: controls stay available in the audio player */}
 
-    function startMetadataPolling(){clearInterval(metadataTimer);updateNowPlaying();metadataTimer=setInterval(updateNowPlaying,60000)}
-    async function updateNowPlaying(){
-      if(!currentStation)return;
-      const title=currentStation.lastchangetitle||currentStation.lastchangetitle_iso8601||'';
-      if(title){els.nowPlaying.textContent='♫ '+title;return}
-      if(currentStation.tags){els.nowPlaying.textContent='♫ '+currentStation.tags.split(',').slice(0,3).join(' · ')}
-      else els.nowPlaying.textContent='Metadati del brano non forniti dalla stazione';
-      if(!currentStation.stationuuid || String(currentStation.stationuuid).startsWith('manual:'))return;
+    function resetTrackMetadata(message='In attesa dei metadati del brano…'){
+      currentTrack=null;currentTrackKey='';artworkLookupKey='';
+      if(artworkAbort){try{artworkAbort.abort()}catch(_){}artworkAbort=null}
+      els.trackTitle.textContent=message;els.trackArtist.textContent='';els.trackAlbum.textContent='';
+      els.trackSource.textContent='Le informazioni dipendono dalla radio';
+      els.trackCover.removeAttribute('src');els.trackCover.hidden=true;els.trackCoverPlaceholder.style.display='grid';
+      if(els.miniArt)els.miniArt.textContent='♫';
+      updateMediaSession();updateMiniPlayer();
+    }
+    function parseTrackTitle(raw){
+      const clean=String(raw||'').replace(/\0/g,'').replace(/StreamTitle\s*=\s*/i,'').replace(/^['"]|['"]$/g,'').replace(/;\s*StreamUrl[\s\S]*$/i,'').trim();
+      if(!clean)return null;
+      let artist='',title=clean;
+      const by=clean.match(/^(.+?)\s+by\s+(.+)$/i);
+      if(by){title=by[1].trim();artist=by[2].trim()}
+      else{
+        const parts=clean.split(/\s+[\-–—]\s+|\s+\/\s+/);
+        if(parts.length>=2){artist=parts.shift().trim();title=parts.join(' - ').trim()}
+      }
+      if(!title)return null;
+      return {raw:clean,title,artist,album:'',year:'',artwork:'',source:'Metadati dello stream'};
+    }
+    function renderTrackMetadata(track){
+      if(!track||!track.title)return;
+      const key=normalize([track.artist,track.title].join('|'));
+      if(key===currentTrackKey){
+        if(track.album&&!currentTrack.album)currentTrack.album=track.album;
+        if(track.year&&!currentTrack.year)currentTrack.year=track.year;
+        if(track.artwork&&!currentTrack.artwork)currentTrack.artwork=track.artwork;
+        renderTrackCard();return;
+      }
+      currentTrack={...track};currentTrackKey=key;artworkLookupKey='';
+      els.trackCover.removeAttribute('src');els.trackCover.hidden=true;els.trackCoverPlaceholder.style.display='grid';
+      renderTrackCard();updateMediaSession();updateMiniPlayer();
+      if(currentTrack.artist)lookupAlbumArtwork(currentTrack);
+    }
+    function renderTrackCard(){
+      const track=currentTrack;
+      if(!track){return}
+      els.trackTitle.textContent=track.title||'Informazioni non disponibili';
+      els.trackArtist.textContent=track.artist||'';
+      const albumLine=[track.album,track.year].filter(Boolean).join(' · ');
+      els.trackAlbum.textContent=albumLine;
+      els.trackSource.textContent=track.source||'Metadati della trasmissione';
+      if(track.artwork){
+        els.trackCover.onload=()=>{els.trackCover.hidden=false;els.trackCoverPlaceholder.style.display='none'};
+        els.trackCover.onerror=()=>{
+          if(track.artworkFallback && els.trackCover.src!==track.artworkFallback){const fallback=track.artworkFallback;track.artworkFallback='';els.trackCover.src=fallback;return}
+          els.trackCover.hidden=true;els.trackCoverPlaceholder.style.display='grid';
+        };
+        els.trackCover.src=track.artwork;
+      }
+      updateMediaSession();updateMiniPlayer();
+    }
+    async function fetchWithTimeout(url,options={},timeoutMs=7500){
+      const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);
+      try{return await fetch(url,{...options,signal:controller.signal,cache:'no-store'})}
+      finally{clearTimeout(timer)}
+    }
+    async function readIcyMetadataOnce(streamUrl){
+      const url=cloudFreeUrl(streamUrl);if(!url)return null;
+      let reader=null;let localController=null;let timer=null;
       try{
-        const result=await apiGet('/json/stations/byuuid',{uuids:currentStation.stationuuid});
-        if(Array.isArray(result)&&result[0]){
-          currentStation={...currentStation,...result[0]};
-          const track=result[0].lastchangetitle||'';
-          if(track)els.nowPlaying.textContent='♫ '+track;
-          updateStationText();
+        const controller=new AbortController();localController=controller;metadataAbort=controller;
+        timer=setTimeout(()=>controller.abort(),9000);
+        const response=await fetch(url,{method:'GET',mode:'cors',headers:{'Icy-MetaData':'1','Accept':'*/*'},signal:controller.signal,cache:'no-store'});
+        if(!response.ok)return null;
+        const headerTitle=response.headers.get('icy-title')||response.headers.get('x-audiocast-title');
+        if(headerTitle){const parsed=parseTrackTitle(headerTitle);if(parsed){parsed.source='Titolo fornito dal server radio';return parsed}}
+        const metaint=Number(response.headers.get('icy-metaint'));
+        if(!Number.isFinite(metaint)||metaint<1||!response.body||!response.body.getReader)return null;
+        reader=response.body.getReader();let buffer=new Uint8Array(0);
+        const fill=async needed=>{
+          while(buffer.length<needed){const part=await reader.read();if(part.done)throw new Error('Fine stream metadata');const chunk=part.value||new Uint8Array(0);const merged=new Uint8Array(buffer.length+chunk.length);merged.set(buffer);merged.set(chunk,buffer.length);buffer=merged}
+        };
+        // Legge al massimo tre blocchi ICY: il primo può non contenere un titolo.
+        for(let block=0;block<3;block++){
+          await fill(metaint+1);const length=buffer[metaint]*16;let metadata='';
+          await fill(metaint+1+length);
+          if(length){
+            const bytes=buffer.slice(metaint+1,metaint+1+length);
+            metadata=new TextDecoder('utf-8').decode(bytes);
+            if(metadata.includes(' ')){try{metadata=new TextDecoder('windows-1252').decode(bytes)}catch(_){}}
+            metadata=metadata.replace(/\0+$/g,'').trim();
+          }
+          buffer=buffer.slice(metaint+1+length);
+          const match=metadata.match(/StreamTitle\s*=\s*(['"])(.*?)\1/i);
+          const raw=match?match[2]:metadata;
+          const parsed=parseTrackTitle(raw);
+          if(parsed){parsed.source='Metadati ICY dello stream';return parsed}
         }
-      }catch(_){/* Metadati opzionali: la radio continua comunque a suonare. */}
+      }catch(error){/* Molti flussi non espongono ICY al browser per CORS o preflight. */}
+      finally{
+        if(timer)clearTimeout(timer);
+        if(reader){try{await reader.cancel()}catch(_){}}
+        if(metadataAbort===localController)metadataAbort=null;
+      }
+      return null;
+    }
+    function extractIcecastSource(data,streamUrl){
+      const sources=data&&data.icestats&&data.icestats.source;if(!sources)return null;
+      const list=Array.isArray(sources)?sources:[sources];let targetPath='';try{targetPath=new URL(streamUrl).pathname}catch(_){}
+      const source=list.find(item=>{try{return item.listenurl&&new URL(item.listenurl).pathname===targetPath}catch(_){return false}})||list[0];
+      if(!source)return null;
+      const raw=source.title||source.streamtitle||source.songtitle||source.yp_currently_playing;
+      if(raw){const parsed=parseTrackTitle(raw);if(parsed){if(source.artist&&!parsed.artist)parsed.artist=String(source.artist);parsed.album=source.album||'';parsed.source='Stato Icecast';return parsed}}
+      if(source.artist&&source.title){return {raw:source.title,title:String(source.title),artist:String(source.artist),album:source.album||'',year:'',artwork:'',source:'Stato Icecast'}}
+      return null;
+    }
+    async function readServerStatus(streamUrl){
+      let u;try{u=new URL(streamUrl)}catch(_){return null}
+      if(u.protocol!=='https:')return null;
+      const candidates=[u.origin+'/status-json.xsl',u.origin+'/stats?sid=1&json=1'];
+      for(const endpoint of candidates){
+        try{
+          const response=await fetchWithTimeout(endpoint,{mode:'cors',headers:{Accept:'application/json'}},5500);if(!response.ok)continue;
+          const data=await response.json();
+          const ice=extractIcecastSource(data,streamUrl);if(ice)return ice;
+          const raw=data.songtitle||data.song_title||data.current_song||data.title;
+          if(raw){const parsed=parseTrackTitle(raw);if(parsed){parsed.source='Stato del server radio';return parsed}}
+        }catch(_){/* Endpoint non disponibile o CORS: si passa oltre. */}
+      }
+      return null;
+    }
+    async function lookupAlbumArtwork(track){
+      const lookupKey=normalize([track.artist,track.title].join('|'));if(!track.artist||!track.title||artworkLookupKey===lookupKey)return;
+      artworkLookupKey=lookupKey;
+      const controller=new AbortController();if(artworkAbort)try{artworkAbort.abort()}catch(_){}artworkAbort=controller;
+      let lookupTimer=null;
+      // MusicBrainz richiede al massimo una richiesta al secondo: rispetta il limite anche fra cambi brano rapidi.
+      const wait=Math.max(0,1100-(Date.now()-lastMusicBrainzRequest));if(wait)await new Promise(resolve=>setTimeout(resolve,wait));
+      if(!currentTrack||normalize([currentTrack.artist,currentTrack.title].join('|'))!==lookupKey)return;
+      lastMusicBrainzRequest=Date.now();
+      try{
+        lookupTimer=setTimeout(()=>controller.abort(),8000);
+        const escapeLucene=value=>String(value).replace(/[+\-!(){}\[\]^"~*?:\\/]/g,'\\$&');
+        const query='recording:"'+escapeLucene(track.title)+'" AND artist:"'+escapeLucene(track.artist)+'"';
+        const url='https://musicbrainz.org/ws/2/recording/?'+new URLSearchParams({query,fmt:'json',limit:'5'}).toString();
+        const response=await fetch(url,{mode:'cors',headers:{Accept:'application/json'},signal:controller.signal,cache:'no-store'});
+        if(!response.ok)return;
+        const data=await response.json();const recordings=Array.isArray(data.recordings)?data.recordings:[];
+        const wantedTitle=normalize(track.title);const wantedArtist=normalize(track.artist);
+        const candidates=recordings.map(recording=>{
+          const artist=(recording['artist-credit']||[]).map(item=>item.name||item.artist&&item.artist.name||'').join('');
+          const score=Number(recording.score)||0;const title=normalize(recording.title||'');
+          const exactTitle=title===wantedTitle;const artistMatch=normalize(artist).includes(wantedArtist)||wantedArtist.includes(normalize(artist));
+          return {recording,artist,score,exactTitle,artistMatch}
+        }).filter(item=>item.score>=75 && (item.exactTitle||item.artistMatch));
+        candidates.sort((a,b)=>(b.exactTitle-a.exactTitle)||(b.artistMatch-a.artistMatch)||(b.score-a.score));
+        const match=candidates[0];if(!match)return;
+        const releases=Array.isArray(match.recording.releases)?match.recording.releases.slice():[];
+        const releaseRank=item=>((item.status==='Official'?4:0)+((item['release-group']&&item['release-group']['primary-type']==='Album')?3:0)+((item['release-group']&&item['release-group']['primary-type']==='EP')?1:0));
+        releases.sort((a,b)=>(releaseRank(b)-releaseRank(a))||String(a.date||'9999').localeCompare(String(b.date||'9999')));
+        const release=releases.find(item=>item.id)||null;if(!release)return;
+        if(!currentTrack||normalize([currentTrack.artist,currentTrack.title].join('|'))!==lookupKey)return;
+        if(release.title&&!currentTrack.album)currentTrack.album=release.title;
+        if(release.date&&!currentTrack.year)currentTrack.year=String(release.date).slice(0,4);
+        currentTrack.source=(currentTrack.source||'Metadati dello stream')+' · Copertina MusicBrainz';
+        currentTrack.artwork='https://coverartarchive.org/release/'+encodeURIComponent(release.id)+'/front-500';
+        currentTrack.artworkFallback=release['release-group']&&release['release-group'].id?'https://coverartarchive.org/release-group/'+encodeURIComponent(release['release-group'].id)+'/front-500':'';
+        renderTrackCard();
+      }catch(error){/* Se MusicBrainz/Cover Art Archive non risponde, restano titolo e artista. */}
+      finally{if(lookupTimer)clearTimeout(lookupTimer)}
+    }
+    function startMetadataPolling(){
+      clearInterval(metadataTimer);
+      if(metadataAbort){try{metadataAbort.abort()}catch(_){}}
+      metadataAbort=null;metadataBusy=false;
+      metadataStationToken=currentStation?stationKey(currentStation):'';resetTrackMetadata();
+      updateNowPlaying();metadataTimer=setInterval(updateNowPlaying,45000);
+    }
+    async function updateNowPlaying(){
+      if(!currentStation||!isPlaying||metadataBusy)return;
+      const stationToken=stationKey(currentStation);metadataBusy=true;
+      try{
+        const known=currentStation.lastchangetitle||currentStation.lastChangeTitle||currentStation.streamTitle||currentStation.songtitle||'';
+        if(known){const parsed=parseTrackTitle(known);if(parsed){parsed.source='Informazioni della stazione';renderTrackMetadata(parsed);return}}
+        const streamUrl=streamCandidates[streamCandidateIndex]||currentStation.url_resolved||currentStation.url;
+        let track=await readIcyMetadataOnce(streamUrl);
+        if(stationToken!== (currentStation&&stationKey(currentStation)))return;
+        if(!track)track=await readServerStatus(streamUrl);
+        if(stationToken!== (currentStation&&stationKey(currentStation)))return;
+        if(track){renderTrackMetadata(track);return}
+        // Ultimo fallback: eventuali campi estesi presenti nel record Radio Browser.
+        if(currentStation.lastchangetitle){const parsed=parseTrackTitle(currentStation.lastchangetitle);if(parsed){parsed.source='Radio Browser';renderTrackMetadata(parsed);return}}
+        if(!currentTrack){els.trackTitle.textContent='Nessun brano identificato';els.trackArtist.textContent='';els.trackAlbum.textContent='';els.trackSource.textContent='La radio non espone metadati leggibili dal browser';}
+      }finally{metadataBusy=false}
     }
 
     function selectStation(station,open=true){
@@ -814,8 +1027,8 @@
       currentStation=st;streamCandidates=unique([cloudFreeUrl(st.url_resolved),cloudFreeUrl(st.url)].filter(Boolean));streamCandidateIndex=0;playAttempt++;
       clearTimeout(playWatchdog);audio.pause();audio.removeAttribute('src');audio.load();
       isPlaying=false;els.play.textContent='▶';els.stop.disabled=false;els.playerStatus.textContent='Connessione alla radio…';
-      updateStationText();els.nowPlaying.textContent=st.tags?'♫ '+st.tags.split(',').slice(0,3).join(' · '):'Connessione…';
-      renderStations();startMetadataPolling();if(open)openPlayer();playCurrentStream();haptic();
+      updateStationText();resetTrackMetadata('In attesa dei metadati del brano…');
+      renderStations();if(open)openPlayer();playCurrentStream();startMetadataPolling();haptic();
     }
     async function playCurrentStream(){
       if(!currentStation||!streamCandidates.length){setStatus('Stream non disponibile');return}
@@ -836,12 +1049,13 @@
     }
     function resumePlayback(){
       if(!currentStation)return;
-      if(audio.src && audio.paused){audio.play().catch(error=>{setStatus(error.name==='NotAllowedError'?'Tocca Play per avviare':'Impossibile riprendere la radio')});return}
+      if(audio.src && audio.paused){audio.play().then(()=>{if(!metadataTimer)startMetadataPolling()}).catch(error=>{setStatus(error.name==='NotAllowedError'?'Tocca Play per avviare':'Impossibile riprendere la radio')});return}
       if(!audio.src){streamCandidateIndex=0;playCurrentStream()}
     }
     function stopPlayback(){
       playAttempt++;clearTimeout(playWatchdog);clearInterval(metadataTimer);metadataTimer=null;
-      audio.pause();audio.removeAttribute('src');audio.load();isPlaying=false;stopVisualizer();els.play.textContent='▶';setStatus('Fermato');els.nowPlaying.textContent='';updateMiniPlayer();updateMediaSession();
+      if(metadataAbort){try{metadataAbort.abort()}catch(_){}metadataAbort=null}metadataBusy=false;
+      audio.pause();audio.removeAttribute('src');audio.load();isPlaying=false;stopVisualizer();els.play.textContent='▶';setStatus('Fermato');resetTrackMetadata('Riproduzione fermata');updateMiniPlayer();updateMediaSession();
     }
     function stepStation(direction){
       const queue=(currentMode==='favorites'?sortFavorites(Object.values(favorites)):filteredStations.length?filteredStations:allStations);
@@ -851,9 +1065,10 @@
     audio.addEventListener('playing',()=>{clearTimeout(playWatchdog);isPlaying=true;els.play.textContent='Ⅱ';setStatus('In riproduzione');startVisualizer();updateMiniPlayer();updateMediaSession();updateNowPlaying();if(currentStation)recordClick(currentStation)});
     audio.addEventListener('waiting',()=>{if(currentStation)setStatus('Buffering…')});
     audio.addEventListener('stalled',()=>{if(currentStation)setStatus('Connessione lenta…')});
-    audio.addEventListener('pause',()=>{if(audio.src){isPlaying=false;stopVisualizer();els.play.textContent='▶';if(els.playerStatus.textContent==='In riproduzione')setStatus('In pausa');updateMiniPlayer();updateMediaSession()}});
+    audio.addEventListener('pause',()=>{if(audio.src){isPlaying=false;stopVisualizer();clearInterval(metadataTimer);metadataTimer=null;if(els.playerStatus.textContent==='In riproduzione')setStatus('In pausa');els.play.textContent='▶';updateMiniPlayer();updateMediaSession()}});
     audio.addEventListener('error',()=>{if(currentStation && streamCandidates.length){if(streamCandidateIndex+1<streamCandidates.length)tryNextStream('Errore stream');else tryNextStream('Errore stream')}});
     audio.addEventListener('ended',()=>{if(currentStation)setStatus('Trasmissione terminata')});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&isPlaying)updateNowPlaying()});
 
     async function recordClick(station){if(!station.stationuuid||String(station.stationuuid).startsWith('manual:'))return;try{await apiGet('/json/url/'+station.stationuuid,{})}catch(_){}}
 
