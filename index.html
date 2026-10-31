@@ -69,6 +69,8 @@ button,input,select{font:inherit;color:inherit;touch-action:manipulation}button{
 .empty{grid-column:1/-1;text-align:center;padding:34px 22px;color:var(--muted)}
 .empty-icon{font-size:42px;margin-bottom:12px;opacity:.8}.empty h3{margin:0 0 8px;color:var(--text);font-size:16px}.empty p{margin:0;font-size:12px;line-height:1.55}
 .empty-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.catalog-spinner{width:30px;height:30px;margin:0 auto 12px;border:3px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:radioSpin .8s linear infinite}@keyframes radioSpin{to{transform:rotate(360deg)}}
+.catalog-credit{padding:5px 16px 12px;text-align:center;color:var(--muted);font-size:9px;opacity:.72}
 .primary-btn,.secondary-btn{padding:11px 16px;border:0;border-radius:99px;font-size:12px;font-weight:750}
 .primary-btn{background:var(--gradient);color:white}.secondary-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
 /* Mini player dock and bottom navigation */
@@ -132,6 +134,7 @@ button,input,select{font:inherit;color:inherit;touch-action:manipulation}button{
   <div class="stats-row"><div id="stats-line">0 radio disponibili</div><div class="stats-actions"><button class="icon-btn" id="add-station-btn" title="Aggiungi radio" aria-label="Aggiungi radio">＋</button><button class="icon-btn" id="backup-btn" title="Backup radio" aria-label="Backup radio">💾</button></div></div>
   <div id="favorites-tools" class="favorites-tools hidden"><label for="favorites-sort">Ordina</label><select id="favorites-sort"><option value="custom">Personalizzato</option><option value="name">Nome A–Z</option><option value="name-desc">Nome Z–A</option><option value="genre">Genere</option></select></div>
   <div id="station-grid"></div>
+  <div class="catalog-credit">Catalogo radio: <a href="https://www.radio-browser.info/" target="_blank" rel="noopener" style="color:inherit">Radio Browser</a> · dati pubblici</div>
  </main>
  <div id="mini-player" aria-live="polite"><div class="mini-art">📻</div><div class="mini-info" id="mini-open"><div class="mini-title" id="mini-title">Radio</div><div class="mini-sub" id="mini-sub">Pronta</div></div><button class="mini-btn" id="mini-toggle" aria-label="Riproduci o pausa">▶</button></div>
  <nav id="bottom-nav" role="tablist" aria-label="Navigazione">
@@ -178,7 +181,9 @@ button,input,select{font:inherit;color:inherit;touch-action:manipulation}button{
 (()=>{
  'use strict';
  const TG=window.Telegram?.WebApp||null,IS_TG=!!(TG?.initData);
- const STORAGE_KEY='radio_live_stations_v1',CLOUD_KEY='radio_live_stations_v1_cloud';
+ const STORAGE_KEY='radio_live_stations_v1',CLOUD_KEY='radio_live_stations_v1_cloud',DIRECTORY_KEY='radio_live_directory_loaded_v1';
+ const RADIO_BROWSER_MIRRORS=['https://de1.api.radio-browser.info','https://nl1.api.radio-browser.info','https://at1.api.radio-browser.info'];
+ let directoryLoading=false,directoryError='';
  const $=id=>document.getElementById(id);
  const el={app:$('app'),content:$('content'),search:$('search'),clear:$('clear-search'),stats:$('stats-line'),grid:$('station-grid'),favTools:$('favorites-tools'),sort:$('favorites-sort'),mini:$('mini-player'),miniTitle:$('mini-title'),miniSub:$('mini-sub'),miniToggle:$('mini-toggle'),modal:$('player-modal'),playerBack:$('player-back'),playerName:$('player-name'),playerCenterName:$('player-center-name'),genre:$('player-genre'),status:$('player-status'),play:$('play-toggle'),favorite:$('player-favorite'),retry:$('retry-play'),remove:$('remove-station'),audio:$('audio'),volume:$('volume'),stationModal:$('station-modal'),stationModalTitle:$('station-modal-title'),nameInput:$('station-name-input'),urlInput:$('station-url-input'),genreInput:$('station-genre-input'),stationModalStatus:$('station-modal-status'),backupModal:$('backup-modal'),backupStatus:$('backup-status'),importFile:$('import-file'),toast:$('toast')};
  let stations=[],filtered=[],mode='all',query='',active=null,editingId=null,playAttempt=0,attemptTimer=0,toastTimer=0,playerHistory=false;
@@ -212,22 +217,71 @@ button,input,select{font:inherit;color:inherit;touch-action:manipulation}button{
  function localSave(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(stations))}catch(error){console.warn('Salvataggio locale:',error)}}
  function cloudSave(){
   if(!IS_TG||!TG.CloudStorage)return;
-  const value=JSON.stringify(stations);
-  // CloudStorage ha limiti di dimensione: se l'elenco è troppo grande resta salvato localmente e nel backup.
-  if(value.length>3500){console.info('Elenco radio oltre il limite prudenziale CloudStorage; usa il backup JSON.');return}
+  // La directory viene ricaricata da Radio Browser; su Telegram sincronizziamo solo preferiti e radio inserite dall'utente.
+  const compact=stations.filter(s=>s.favorite||!s.radioBrowserUuid);
+  let value=JSON.stringify(compact);
+  if(value.length>3500){
+   value=JSON.stringify(compact.filter(s=>s.favorite));
+   if(value.length>3500){console.info('Preferiti oltre il limite CloudStorage; usa il backup JSON.');return}
+  }
   try{TG.CloudStorage.setItem(CLOUD_KEY,value,error=>{if(error)console.warn('CloudStorage:',error)})}catch(error){console.warn('CloudStorage:',error)}
  }
  function save(){localSave();cloudSave()}
  function validStation(item){return item&&typeof item.name==='string'&&item.name.trim()&&typeof item.url==='string'&&/^https?:\/\//i.test(item.url.trim())}
- function cleanStation(item){return{id:typeof item.id==='string'?item.id:makeId(),name:item.name.trim().slice(0,80),url:item.url.trim(),genre:String(item.genre||item.category||'Radio online').trim().slice(0,60),favorite:!!item.favorite,addedAt:Number(item.addedAt)||Date.now()}}
+ function cleanStation(item){return{id:typeof item.id==='string'?item.id:makeId(),name:item.name.trim().slice(0,80),url:item.url.trim(),genre:String(item.genre||item.category||'Radio online').trim().slice(0,60),favorite:!!item.favorite,addedAt:Number(item.addedAt)||Date.now(),radioBrowserUuid:typeof item.radioBrowserUuid==='string'?item.radioBrowserUuid:(typeof item.stationuuid==='string'?item.stationuuid:'')}}
  function loadLocal(){const data=safeParse(localStorage.getItem(STORAGE_KEY)||'[]');if(Array.isArray(data))stations=data.filter(validStation).map(cleanStation)}
  function loadCloud(){
-  if(!IS_TG||!TG.CloudStorage)return;
-  try{TG.CloudStorage.getItem(CLOUD_KEY,(error,value)=>{
-   if(error||!value)return;const remote=safeParse(value);if(!Array.isArray(remote))return;
-   const map=new Map(stations.map(s=>[s.id,s]));remote.filter(validStation).map(cleanStation).forEach(s=>{if(!map.has(s.id))map.set(s.id,s)});
-   const merged=[...map.values()];if(merged.length!==stations.length){stations=merged;localSave();render()}
-  })}catch(error){console.warn('CloudStorage load:',error)}
+  return new Promise(resolve=>{
+   if(!IS_TG||!TG.CloudStorage)return resolve();
+   try{TG.CloudStorage.getItem(CLOUD_KEY,(error,value)=>{
+    if(error||!value)return resolve();const remote=safeParse(value);if(!Array.isArray(remote))return resolve();
+    const byUrl=new Map(stations.map(s=>[s.url,s]));let changed=false;
+    remote.filter(validStation).map(cleanStation).forEach(s=>{const existing=byUrl.get(s.url);if(existing){if(s.favorite&&!existing.favorite){existing.favorite=true;changed=true}}else{stations.push(s);byUrl.set(s.url,s);changed=true}});
+    if(changed)localSave();resolve();
+   })}catch(error){console.warn('CloudStorage load:',error);resolve()}
+  });
+ }
+ function fetchRadioBrowser(path){
+  const attempts=RADIO_BROWSER_MIRRORS.map(async base=>{
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8500);
+   try{
+    const response=await fetch(base+path,{method:'GET',mode:'cors',cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    const data=await response.json();if(!Array.isArray(data)||!data.length)throw new Error('Catalogo vuoto');return data;
+   }finally{clearTimeout(timer)}
+  });
+  return Promise.any(attempts);
+ }
+ function mapDirectoryStation(item){
+  const url=String(item.url_resolved||item.url||'').trim();
+  if(!item.name||!url||!/^https:\/\//i.test(url)||Number(item.lastcheckok)===0||Number(item.hls)===1)return null;
+  if(/\.(pls|m3u|m3u8|asx)(?:$|[?#])/i.test(url))return null;
+  const codec=String(item.codec||'').toUpperCase();
+  if(codec&&!/(MP3|AAC|OGG|OPUS|FLAC)/.test(codec))return null;
+  const tags=String(item.tags||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,2).join(' · ');
+  const country=String(item.country||'').trim();
+  const genre=[tags,country].filter(Boolean).join(' · ')||'Radio online';
+  return cleanStation({id:item.stationuuid?'rb_'+item.stationuuid:makeId(),radioBrowserUuid:item.stationuuid||'',name:item.name,url,genre,favorite:false});
+ }
+ async function loadRadioDirectory(){
+  if(directoryLoading)return;directoryLoading=true;directoryError='';render();
+  const endpoints=[
+   '/json/stations/search?hidebroken=true&is_https=true&order=clickcount&reverse=true&limit=120',
+   '/json/stations/search?countrycode=IT&hidebroken=true&is_https=true&order=clickcount&reverse=true&limit=80'
+  ];
+  let found=[];
+  try{
+   for(const endpoint of endpoints){
+    try{const raw=await fetchRadioBrowser(endpoint);const mapped=raw.map(mapDirectoryStation).filter(Boolean);if(mapped.length){found=mapped;break}}
+    catch(error){console.warn('Radio Browser:',error)}
+   }
+   if(!found.length)throw new Error('Nessuna stazione compatibile disponibile dal catalogo');
+   const byUrl=new Map(stations.map(s=>[s.url,s]));let added=0;
+   found.forEach(station=>{const existing=byUrl.get(station.url);if(existing){if(station.radioBrowserUuid&&!existing.radioBrowserUuid)existing.radioBrowserUuid=station.radioBrowserUuid}else{stations.push(station);byUrl.set(station.url,station);added++}});
+   localStorage.setItem(DIRECTORY_KEY,'1');directoryError='';localSave();
+   console.info('Radio Browser: aggiunte '+added+' stazioni; catalogo totale '+stations.length);
+  }catch(error){directoryError='Non riesco a raggiungere il catalogo radio. Controlla la connessione e riprova.';console.warn('Caricamento catalogo radio:',error)}
+  finally{directoryLoading=false;render()}
  }
  function favCount(){return stations.filter(s=>s.favorite).length}
  function applyFilter(){
@@ -237,10 +291,25 @@ button,input,select{font:inherit;color:inherit;touch-action:manipulation}button{
   if(mode==='favorites'&&sort!=='custom')filtered.sort((a,b)=>sort==='name'?a.name.localeCompare(b.name,'it'):sort==='name-desc'?b.name.localeCompare(a.name,'it'):a.genre.localeCompare(b.genre,'it')||a.name.localeCompare(b.name,'it'));
   renderGrid();
  }
- function render(){el.favTools.classList.toggle('hidden',mode!=='favorites');el.stats.innerHTML='';const count=mode==='favorites'?favCount():stations.length;const strong=document.createElement('strong');strong.textContent=count.toLocaleString('it-IT');el.stats.append(strong,document.createTextNode(mode==='favorites'?' radio preferite':' radio disponibili'));applyFilter();}
+ function render(){
+  el.favTools.classList.toggle('hidden',mode!=='favorites');el.stats.replaceChildren();
+  if(directoryLoading&&!stations.length&&mode==='all'){el.stats.textContent='Ricerca radio disponibili…'}
+  else{const count=mode==='favorites'?favCount():stations.length;const strong=document.createElement('strong');strong.textContent=count.toLocaleString('it-IT');el.stats.append(strong,document.createTextNode(mode==='favorites'?' radio preferite':' radio disponibili'))}
+  applyFilter();
+ }
  function renderGrid(){
   el.grid.replaceChildren();
-  if(!filtered.length){const box=document.createElement('div');box.className='empty';const icon=document.createElement('div');icon.className='empty-icon';icon.textContent=mode==='favorites'?'☆':'📻';const title=document.createElement('h3');title.textContent=query?'Nessuna radio trovata':mode==='favorites'?'Ancora nessun preferito':'La lista è vuota';const desc=document.createElement('p');desc.textContent=query?'Prova con un altro nome o genere.':'Aggiungi una stazione Internet con un indirizzo diretto autorizzato.';const actions=document.createElement('div');actions.className='empty-actions';const add=document.createElement('button');add.className='primary-btn';add.textContent='＋ Aggiungi radio';add.addEventListener('click',openStationModal);actions.append(add);box.append(icon,title,desc,actions);el.grid.append(box);return}
+  if(!filtered.length){
+   const box=document.createElement('div');box.className='empty';
+   if(directoryLoading&&mode==='all'&&!query){const spinner=document.createElement('div');spinner.className='catalog-spinner';const title=document.createElement('h3');title.textContent='Caricamento delle radio';const desc=document.createElement('p');desc.textContent='Sto cercando le stazioni Internet disponibili…';box.append(spinner,title,desc);el.grid.append(box);return}
+   const icon=document.createElement('div');icon.className='empty-icon';icon.textContent=mode==='favorites'?'☆':'📻';
+   const title=document.createElement('h3');title.textContent=query?'Nessuna radio trovata':mode==='favorites'?'Ancora nessun preferito':directoryError?'Catalogo non disponibile':'La lista è vuota';
+   const desc=document.createElement('p');desc.textContent=query?'Prova con un altro nome o genere.':mode==='favorites'?'Aggiungi una stazione ai preferiti toccando la stella.':directoryError||'Aggiungi una radio con il pulsante + oppure carica nuovamente il catalogo.';
+   const actions=document.createElement('div');actions.className='empty-actions';
+   const add=document.createElement('button');add.className='primary-btn';add.textContent='＋ Aggiungi radio';add.addEventListener('click',openStationModal);actions.append(add);
+   if(mode==='all'&&directoryError){const retry=document.createElement('button');retry.className='secondary-btn';retry.textContent='↻ Riprova catalogo';retry.addEventListener('click',loadRadioDirectory);actions.append(retry)}
+   box.append(icon,title,desc,actions);el.grid.append(box);return
+  }
   const frag=document.createDocumentFragment();filtered.forEach((station,index)=>frag.append(createCard(station,index)));el.grid.append(frag);
  }
  function createCard(station,index){
@@ -268,6 +337,7 @@ button,input,select{font:inherit;color:inherit;touch-action:manipulation}button{
  function stopAttemptTimer(){clearTimeout(attemptTimer);attemptTimer=0}
  async function playStation(station){
   if(!station)return;const token=++playAttempt;stopAttemptTimer();
+  if(station.radioBrowserUuid&&!station._counted){station._counted=true;fetch(RADIO_BROWSER_MIRRORS[0]+'/json/url/'+encodeURIComponent(station.radioBrowserUuid),{mode:'cors',cache:'no-store'}).catch(()=>{});}
   try{el.audio.pause();el.audio.removeAttribute('src');el.audio.load();el.audio.src=station.url;el.audio.load();setStatus('Connessione alla radio…');setPlayState(false);el.mini.classList.add('visible');
    attemptTimer=setTimeout(()=>{if(token===playAttempt&&el.audio.paused){setStatus('La radio non risponde. Puoi riprovare.');setPlayState(false)}},20000);
    await el.audio.play();
@@ -315,7 +385,13 @@ button,input,select{font:inherit;color:inherit;touch-action:manipulation}button{
  window.addEventListener('popstate',()=>{if(el.stationModal.classList.contains('visible'))closeStationModal();else if(el.backupModal.classList.contains('visible'))closeBackupModal();else if(el.modal.classList.contains('open'))closePlayer(true)});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(el.stationModal.classList.contains('visible'))closeStationModal();else if(el.backupModal.classList.contains('visible'))closeBackupModal();else if(el.modal.classList.contains('open'))closePlayer()}});
  // Do not pause on visibilitychange: allow the browser/OS to continue audio when supported.
- function init(){loadLocal();setupTelegram();render();loadCloud();el.audio.volume=Number(el.volume.value);}
+ async function init(){
+  loadLocal();setupTelegram();el.audio.volume=Number(el.volume.value);render();
+  await loadCloud();
+  const directoryReady=stations.length>0&&(localStorage.getItem(DIRECTORY_KEY)==='1'||stations.some(s=>!!s.radioBrowserUuid));
+  if(!directoryReady)await loadRadioDirectory();
+  else render();
+ }
  init();
 })();
 </script>
