@@ -491,7 +491,8 @@
 
     const API_HOSTS = ['https://de1.api.radio-browser.info','https://nl1.api.radio-browser.info','https://at1.api.radio-browser.info'];
     let apiHostIndex = Math.floor(Math.random()*API_HOSTS.length);
-    const PAGE_SIZE = 90;
+    const PAGE_SIZE = 1000;
+    const INITIAL_BATCHES = 5;
     const TARGET_STATIONS = 20000;
     const FAVORITES_KEY = 'dab_radio_favorites_v1';
     const ORDER_KEY = 'dab_radio_favorites_order_v1';
@@ -510,6 +511,7 @@
     let hasMore = true;
     let isLoading = false;
     let searchTimer = null;
+    let autoLoadTimer = null;
     let toastTimer = null;
     let cloudSaveTimer = null;
     let currentStation = null;
@@ -652,7 +654,7 @@
           const data=await apiGet('/json/stations/search',apiParams(PAGE_SIZE,nextOffset,null,''));
           received=Array.isArray(data)?data:[];hasNext=received.length===PAGE_SIZE;nextOffset+=received.length;
         }else{
-          const fields=['name','country','tag'];const perField=30;const offset=nextOffset;
+          const fields=['name','country','tag'];const perField=100;const offset=nextOffset;
           const results=await Promise.allSettled(fields.map(field=>apiGet('/json/stations/search',apiParams(perField,offset,field,query))));
           let successfulQueries=0;
           results.forEach(result=>{if(result.status==='fulfilled' && Array.isArray(result.value)){successfulQueries++;received.push(...result.value);if(result.value.length===perField)hasNext=true}});
@@ -664,14 +666,37 @@
         if(!received.length && !allStations.length){showEmpty('Nessuna stazione disponibile','Il catalogo non ha restituito risultati. Puoi riprovare o aggiungere una radio manualmente.','📻')}
         renderStations();
         if(!query && added===0 && received.length===0)hasMore=false;
-        if(query && !received.length && nextOffset===30)showToast('Nessun risultato: prova un altro nome, paese o genere');
+        if(query && !received.length && nextOffset===100)showToast('Nessun risultato: prova un altro nome, paese o genere');
       }catch(error){
         console.error('Radio Browser:',error);hasMore=false;
         if(!allStations.length)showEmpty('Catalogo momentaneamente non disponibile','Controlla la connessione e riprova. I Preferiti e le radio salvate restano disponibili.','⚠️');
         else showToast('Catalogo non raggiungibile: puoi continuare con i Preferiti');
       }finally{
-        isLoading=false;els.loadMore.disabled=!hasMore;els.loadMore.textContent=hasMore?'Carica altre stazioni':'Fine elenco';els.loadWrap.style.display=currentMode==='all' && hasMore?'flex':'none';updateStats();
+        isLoading=false;
+        els.loadMore.disabled=!hasMore;
+        els.loadMore.textContent=hasMore?'Carica altre stazioni':'Fine elenco';
+        els.loadWrap.style.display=currentMode==='all' && hasMore?'flex':'none';
+        updateStats();
+        // Se il primo lotto non riempie ancora la schermata, continua automaticamente.
+        scheduleAutoLoad();
       }
+    }
+    async function loadInitialCatalog(){
+      // Ripristina il comportamento originario: 5 pagine iniziali da 1.000 stazioni.
+      for(let page=0;page<INITIAL_BATCHES;page++){
+        if(page===0)await loadPage(false);
+        else if(hasMore)await loadPage(true);
+        else break;
+        if(currentMode!=='all'||currentQuery)break;
+      }
+    }
+    function scheduleAutoLoad(){
+      clearTimeout(autoLoadTimer);
+      autoLoadTimer=setTimeout(()=>{
+        if(currentMode!=='all'||isLoading||!hasMore)return;
+        const remaining=els.content.scrollHeight-els.content.scrollTop-els.content.clientHeight;
+        if(remaining<700)loadPage(true);
+      },140);
     }
     function showEmpty(title,message,icon='📻'){
       els.list.innerHTML='';const box=document.createElement('div');box.className='empty-state';box.innerHTML='<div class="empty-icon"></div><h3></h3><p></p>';box.querySelector('.empty-icon').textContent=icon;box.querySelector('h3').textContent=title;box.querySelector('p').textContent=message;els.list.appendChild(box);
@@ -720,7 +745,7 @@
       const total=filteredStations.length;const allCount=allStations.length;
       if(currentMode==='favorites')els.stats.innerHTML='<strong>'+total.toLocaleString('it-IT')+'</strong> preferiti';
       else if(currentQuery)els.stats.innerHTML='<strong>'+total.toLocaleString('it-IT')+'</strong> risultati <span>· '+allCount.toLocaleString('it-IT')+' caricate</span>';
-      else els.stats.innerHTML='<strong>'+allCount.toLocaleString('it-IT')+'</strong> stazioni caricate <span>· catalogo progressivo</span>';
+      else els.stats.innerHTML='<strong>'+allCount.toLocaleString('it-IT')+'</strong> stazioni caricate <span>· scorri per caricarne altre</span>';
     }
     function applyMode(mode){currentMode=mode;document.querySelectorAll('.nav-btn').forEach(btn=>{const active=btn.dataset.mode===mode;btn.classList.toggle('active',active);btn.setAttribute('aria-selected',String(active))});if(mode==='favorites'){els.sortWrap.classList.add('visible');renderStations()}else{els.sortWrap.classList.remove('visible');if(currentQuery)loadPage(false);else if(!allStations.length)loadPage(false);else renderStations()}haptic()}
 
@@ -862,7 +887,7 @@
     function runSearch(){
       currentQuery=els.search.value.trim();els.clearSearch.classList.toggle('visible',!!currentQuery);
       if(currentMode==='favorites'){renderStations();return}
-      clearTimeout(searchTimer);searchTimer=setTimeout(()=>{loadPage(false)},420);
+      clearTimeout(searchTimer);searchTimer=setTimeout(()=>{if(currentQuery)loadPage(false);else loadInitialCatalog()},420);
     }
 
     // Eventi interfaccia
@@ -871,6 +896,7 @@
     els.clearSearch.addEventListener('click',()=>{els.search.value='';runSearch();els.search.blur()});
     els.sort.addEventListener('change',()=>{renderStations();saveState()});
     els.loadMore.addEventListener('click',()=>loadPage(true));
+    els.content.addEventListener('scroll',()=>scheduleAutoLoad(),{passive:true});
     $('add-station-btn').addEventListener('click',openManualModal);
     $('backup-btn').addEventListener('click',openBackupModal);
     $('close-station-modal').addEventListener('click',()=>closeModal(els.stationModal));
@@ -1431,7 +1457,7 @@
     loadLocalState();
     initVisualizer();
     renderStations();
-    loadPage(false);
+    loadInitialCatalog();
     loadCloudState().catch(error=>console.warn('Sincronizzazione Telegram:',error));
 
   })();
